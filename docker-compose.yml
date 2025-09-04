@@ -1,0 +1,95 @@
+version: '3.8'
+
+x-common-variables: &common-variables
+  REDIS_URL: redis://redis:6379/0
+  DATABASE_URL: postgresql://user:password@postgres:5432/flexbot
+  ENVIRONMENT: production
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: flexbot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flex-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass $${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    environment:
+      REDIS_PASSWORD: $${REDIS_PASSWORD}
+    networks:
+      - flex-network
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      <<: *common-variables
+      REDIS_PASSWORD: $${REDIS_PASSWORD}
+    volumes:
+      - ./models:/models
+      - ./logs:/logs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flex-network
+
+  celery-worker:
+    build: .
+    command: celery -A tasks worker --loglevel=info -Q high_priority,medium_priority,low_priority
+    environment:
+      <<: *common-variables
+      REDIS_PASSWORD: $${REDIS_PASSWORD}
+    volumes:
+      - ./models:/models
+      - ./logs:/logs
+    depends_on:
+      - redis
+      - app
+    networks:
+      - flex-network
+
+  celery-beat:
+    build: .
+    command: celery -A tasks beat --loglevel=info
+    environment:
+      <<: *common-variables
+      REDIS_PASSWORD: $${REDIS_PASSWORD}
+    volumes:
+      - ./models:/models
+      - ./logs:/logs
+    depends_on:
+      - redis
+      - app
+    networks:
+      - flex-network
+
+  flower:
+    image: mher/flower:0.9.7
+    environment:
+      CELERY_BROKER_URL: redis://:$${REDIS_PASSWORD}@redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - flex-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  flex-network:
+    driver: bridge

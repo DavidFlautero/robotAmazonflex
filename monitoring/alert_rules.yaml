@@ -1,0 +1,154 @@
+groups:
+- name: amazon-flex-alerts
+  rules:
+  - alert: HighAnomalyDetection
+    expr: anomaly_score < -0.7
+    for: 5m
+    labels:
+      severity: critical
+      component: evasion
+      app: amazon-flex-bot
+    annotations:
+      description: "Alto nivel de detección de anomalías (score: {{ $value }}) - Posible detección por Amazon"
+      summary: "Detección de anomalías crítica"
+
+  - alert: ProxyFailureRateHigh
+    expr: rate(proxy_failures_total[5m]) / rate(proxy_requests_total[5m]) > 0.3
+    for: 10m
+    labels:
+      severity: warning
+      component: network
+      app: amazon-flex-bot
+    annotations:
+      description: "Tasa de fallos de proxy del {{ $value | humanizePercentage }} - Revisar proveedores de proxy"
+      summary: "Tasa de fallos de proxy alta"
+
+  - alert: APIDown
+    expr: up{job="amazon-flex-bot"} == 0
+    for: 5m
+    labels:
+      severity: critical
+      component: api
+      app: amazon-flex-bot
+    annotations:
+      description: "La API de Amazon Flex Bot no responde por más de 5 minutos"
+      summary: "API fuera de línea"
+
+  - alert: HighResponseTime
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+    for: 10m
+    labels:
+      severity: warning
+      component: performance
+      app: amazon-flex-bot
+    annotations:
+      description: "El 95% de las requests tardan más de 2 segundos (actual: {{ $value }}s)"
+      summary: "Alta latencia en respuestas"
+
+  - alert: CaptureSuccessRateLow
+    expr: rate(block_capture_success_total[5m]) / rate(block_capture_attempts_total[5m]) < 0.5
+    for: 15m
+    labels:
+      severity: warning
+      component: capture
+      app: amazon-flex-bot
+    annotations:
+      description: "Tasa de éxito en captura de bloques inferior al 50% ({{ $value | humanizePercentage }})"
+      summary: "Baja tasa de éxito en capturas"
+
+  - alert: DatabaseConnectionError
+    expr: rate(database_errors_total[5m]) > 5
+    for: 5m
+    labels:
+      severity: critical
+      component: database
+      app: amazon-flex-bot
+    annotations:
+      description: "Alta tasa de errores de base de datos ({{ $value }} errores/minuto)"
+      summary: "Problemas de conexión a la base de datos"
+
+  - alert: MemoryUsageHigh
+    expr: container_memory_usage_bytes{container="amazon-flex-bot"} / container_spec_memory_limit_bytes > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+      app: amazon-flex-bot
+    annotations:
+      description: "Uso de memoria superior al 80% ({{ $value | humanizePercentage }})"
+      summary: "Alto uso de memoria"
+
+  - alert: CPUUsageHigh
+    expr: rate(container_cpu_usage_seconds_total{container="amazon-flex-bot"}[5m]) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+      app: amazon-flex-bot
+    annotations:
+      description: "Uso de CPU superior al 80% ({{ $value | humanizePercentage }})"
+      summary: "Alto uso de CPU"
+
+  - alert: TooManyRestarts
+    expr: increases(kube_pod_container_status_restarts_total{container="amazon-flex-bot"}[15m]) > 3
+    for: 5m
+    labels:
+      severity: warning
+      component: infrastructure
+      app: amazon-flex-bot
+    annotations:
+      description: "El contenedor se ha reiniciado más de 3 veces en los últimos 15 minutos"
+      summary: "Demasiados reinicios del contenedor"
+
+  - alert: NodeDown
+    expr: up{job="node-exporter"} == 0
+    for: 5m
+    labels:
+      severity: critical
+      component: infrastructure
+    annotations:
+      description: "El nodo {{ $labels.instance }} está fuera de línea"
+      summary: "Nodo de Kubernetes fuera de línea"
+
+  - alert: PodEvicted
+    expr: kube_pod_status_reason{reason="Evicted"} == 1
+    for: 2m
+    labels:
+      severity: critical
+      component: infrastructure
+      app: amazon-flex-bot
+    annotations:
+      description: "El pod {{ $labels.pod }} ha sido expulsado del nodo {{ $labels.node }}"
+      summary: "Pod expulsado"
+
+  - alert: HighNetworkTraffic
+    expr: rate(container_network_receive_bytes_total{container="amazon-flex-bot"}[5m]) > 104857600  # 100 MB/s
+    for: 5m
+    labels:
+      severity: warning
+      component: network
+      app: amazon-flex-bot
+    annotations:
+      description: "Tráfico de red superior a 100 MB/s (actual: {{ $value | humanize }} bytes/s)"
+      summary: "Alto tráfico de red"
+
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"} < 10
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+    annotations:
+      description: "Solo queda el {{ $value | humanize }}% de espacio en disco en el nodo {{ $labels.instance }}"
+      summary: "Espacio en disco bajo"
+
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+    for: 10m
+    labels:
+      severity: warning
+      component: api
+      app: amazon-flex-bot
+    annotations:
+      description: "Tasa de errores HTTP 5xx superior al 5% (actual: {{ $value | humanizePercentage }})"
+      summary: "Alta tasa de errores HTTP"

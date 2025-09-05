@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: amazon-flex-alerts
+  namespace: flex-production
+  labels:
+    app: amazon-flex-bot
+    role: alert-rules
+spec:
+  groups:
+  - name: amazon-flex.rules
+    rules:
+    - alert: HighAnomalyDetection
+      expr: anomaly_score < -0.7
+      for: 5m
+      labels:
+        severity: critical
+        component: evasion
+      annotations:
+        description: "Alto nivel de detección de anomalías (score: {{ $value }})"
+        summary: "Posible detección por parte de Amazon"
+        
+    - alert: ProxyFailureRateHigh
+      expr: rate(proxy_failures_total[5m]) / rate(proxy_requests_total[5m]) > 0.3
+      for: 10m
+      labels:
+        severity: warning
+        component: network
+      annotations:
+        description: "Tasa de fallos de proxy superior al 30%"
+        summary: "Problemas con la infraestructura de proxies"
+        
+    - alert: APIDown
+      expr: up{job="amazon-flex-bot"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: api
+      annotations:
+        description: "La API de Amazon Flex Bot no responde"
+        summary: "API fuera de línea"
+        
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+      for: 10m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        description: "El 95% de las requests tardan más de 2 segundos"
+        summary: "Alta latencia en las respuestas"

@@ -3,9 +3,15 @@ kind: Service
 metadata:
   name: amazon-flex-bot-service
   namespace: flex-production
+  labels:
+    app: amazon-flex-bot
+    component: api
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
 spec:
   selector:
     app: amazon-flex-bot
@@ -14,16 +20,23 @@ spec:
   - name: http
     port: 8080
     targetPort: 8080
+    protocol: TCP
   - name: metrics
     port: 9090
     targetPort: 9090
+    protocol: TCP
   type: LoadBalancer
+  externalTrafficPolicy: Local
+  sessionAffinity: None
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service
   namespace: flex-production
+  labels:
+    app: postgres
+    component: database
 spec:
   selector:
     app: postgres
@@ -31,6 +44,7 @@ spec:
   - name: postgres
     port: 5432
     targetPort: 5432
+    protocol: TCP
   type: ClusterIP
 ---
 apiVersion: v1
@@ -38,6 +52,9 @@ kind: Service
 metadata:
   name: redis-service
   namespace: flex-production
+  labels:
+    app: redis
+    component: cache
 spec:
   selector:
     app: redis
@@ -45,4 +62,5 @@ spec:
   - name: redis
     port: 6379
     targetPort: 6379
+    protocol: TCP
   type: ClusterIP
